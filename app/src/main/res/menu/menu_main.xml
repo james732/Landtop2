@@ -1,0 +1,54 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context=".MainActivity">
+
+    <item
+        app:showAsAction="always"
+        android:title="排序">
+
+        <menu>
+            <group android:checkableBehavior="single" android:id="@+id/group_sort">
+                <item android:checked="true" android:id="@+id/sort_by_web_order" android:title="網頁順序" />
+                <item android:id="@+id/sort_by_money" android:title="價格" />
+                <item android:id="@+id/sort_by_moneydiff" android:title="價格波動" />
+            </group>
+        </menu>
+    </item>
+
+    <item
+        app:showAsAction="always"
+        android:title="顯示">
+
+        <menu>
+            <group android:checkableBehavior="single" android:id="@+id/group_type">
+                <item android:id="@+id/show_phone" android:title="手機" android:checked="true" />
+                <item android:id="@+id/show_pad" android:title="平板" />
+                <item android:id="@+id/show_pad_phone" android:title="手機與平板" />
+                <item android:id="@+id/show_money_diff" android:title="價格有變" />
+            </group>
+        </menu>
+    </item>
+
+    <item
+        app:showAsAction="always"
+        android:title="廠牌">
+
+        <menu>
+            <group android:checkableBehavior="single" android:id="@+id/company">
+                <item android:id="@+id/show_all" android:title="ALL" android:checked="true" />
+                <item android:id="@+id/show_apple" android:title="APPLE" />
+                <item android:id="@+id/show_asus" android:title="ASUS" />
+                <item android:id="@+id/show_htc" android:title="hTC" />
+                <item android:id="@+id/show_lg" android:title="LG" />
+                <item android:id="@+id/show_samsung" android:title="Samsung" />
+                <item android:id="@+id/show_sony" android:title="Sony" />
+                <item android:id="@+id/show_infocus" android:title="InFocus" />
+                <item android:id="@+id/show_huawei" android:title="HUAWEI" />
+                <item android:id="@+id/show_oppo" android:title="oppo" />
+                <item android:id="@+id/show_mi" android:title="MI" />
+                <item android:id="@+id/show_twm" android:title="TWM" />
+            </group>
+        </menu>
+    </item>
+</menu>

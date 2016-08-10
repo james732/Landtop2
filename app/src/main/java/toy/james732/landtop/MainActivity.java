@@ -50,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
         All,
         Phone,
         Tablet,
+        Others,
         MoneyDiff
     }
 
@@ -61,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
         ByDiff
     }
 
-    SortOrder sortOrder = SortOrder.ByWeb;
+    SortOrder sortOrder = SortOrder.ByMoney;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -113,6 +114,23 @@ public class MainActivity extends AppCompatActivity {
         else if (upperStr.contains("TAB") || upperStr.contains("PAD") || upperStr.contains("TABLET")) {
             return true;
         }
+        else if (upperStr.contains("NOKIA N1")) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    private Boolean isOthers(String s) {
+        String upperStr = s.toUpperCase();
+
+        if (upperStr.contains("WATCH")) {
+            return true;
+        }
+        else if (upperStr.contains("R100")) {
+            return true;
+        }
         else {
             return false;
         }
@@ -149,7 +167,7 @@ public class MainActivity extends AppCompatActivity {
                 for (int j = 1; j < phones.size(); j++) {
                     Element phone = phones.get(j);
                     String name = phone.child(0).child(0).child(0).text();
-                    String money = phone.child(1).text().substring(2);
+                    String money = phone.child(1).text().substring(1);
 
                     sb.append(name);
                     sb.append(money);
@@ -158,6 +176,8 @@ public class MainActivity extends AppCompatActivity {
 
                     if (isPad(name)) {
                         pp.type = PhonePrice.Type.Tablet;
+                    } else if (isOthers(name)) {
+                        pp.type = PhonePrice.Type.Others;
                     }
                     else  {
                         pp.type = PhonePrice.Type.Phone;
@@ -321,10 +341,13 @@ public class MainActivity extends AppCompatActivity {
 
         for (PhonePrice pp : currentShow) {
 
-            if (showType == ShowType.Phone && pp.type == PhonePrice.Type.Tablet) {
+            if (showType == ShowType.Phone && pp.type != PhonePrice.Type.Phone) {
                 continue;
             }
-            else if (showType == ShowType.Tablet && pp.type == PhonePrice.Type.Phone) {
+            else if (showType == ShowType.Tablet && pp.type != PhonePrice.Type.Tablet) {
+                continue;
+            }
+            else if (showType == ShowType.Others && pp.type != PhonePrice.Type.Others) {
                 continue;
             }
             else if (showType == ShowType.MoneyDiff
@@ -431,6 +454,11 @@ public class MainActivity extends AppCompatActivity {
                 updateList();
                 return true;
 
+            case R.id.show_others:
+                showType = ShowType.Others;
+                updateList();
+                return true;
+
             default:
                 return super.onOptionsItemSelected(item);
         }
@@ -446,7 +474,11 @@ public class MainActivity extends AppCompatActivity {
 class PhonePrice {
     public PhonePrice(PhoneCompany c, String n, String p, int i) {
         name = c.company + " " + n;
-        price = Integer.parseInt(p);
+        try {
+            price = Integer.parseInt(p);
+        } catch (NumberFormatException e) {
+            price = Integer.MIN_VALUE;
+        }
         id = i;
         prev_price = 0;
     }
@@ -457,33 +489,38 @@ class PhonePrice {
     }
 
     public String getPriceString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("$ ");
-        sb.append(price);
-
-        if (prev_price != 0) {
-            sb.append(" ");
-
-            int diff = prev_price - price;
-            if (diff != 0) {
-                if (diff > 0) {
-                    sb.append(" ↘ $");
-                }
-                else {
-                    sb.append(" ↗ $");
-                    diff = -diff;
-                }
-                sb.append(diff);
-            }
-            else {
-                sb.append(" ー");
-            }
+        if (price == Integer.MAX_VALUE || price == Integer.MIN_VALUE) {
+            return "特價中";
         }
         else {
-            sb.append(" 新");
-        }
+            StringBuilder sb = new StringBuilder();
+            sb.append("$ ");
+            sb.append(price);
 
-        return sb.toString();
+            if (prev_price != 0) {
+                sb.append(" ");
+
+                int diff = prev_price - price;
+                if (diff != 0) {
+                    if (diff > 0) {
+                        sb.append(" ↘ $");
+                    }
+                    else {
+                        sb.append(" ↗ $");
+                        diff = -diff;
+                    }
+                    sb.append(diff);
+                }
+                else {
+                    sb.append(" ー");
+                }
+            }
+            else {
+                sb.append(" 新");
+            }
+
+            return sb.toString();
+        }
     }
 
     public PriceStatus getPriceStatus() {
@@ -517,7 +554,8 @@ class PhonePrice {
 
     public enum Type {
         Phone,
-        Tablet
+        Tablet,
+        Others,
     }
 
     public enum PriceStatus {
@@ -552,6 +590,7 @@ class PhoneCompany {
         COOLPAD,
         MI,
         TWM,
+        SHARP,
         UNKNOWN,
     }
 
@@ -577,6 +616,7 @@ class PhoneCompany {
         companyPicMap.put("images/prodpt/886lV7.jpg", CompanyEnum.COOLPAD);
         companyPicMap.put("images/prodpt/734wY8.gif", CompanyEnum.MI);
         companyPicMap.put("images/prodpt/084DtY.jpg", CompanyEnum.TWM);
+        companyPicMap.put("images/prodpt/319uKq.jpg", CompanyEnum.SHARP);
     };
 
     static public PhoneCompany getCompanyFromPicture(String name) {

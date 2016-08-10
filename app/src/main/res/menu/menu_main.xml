@@ -9,8 +9,8 @@
 
         <menu>
             <group android:checkableBehavior="single" android:id="@+id/group_sort">
-                <item android:checked="true" android:id="@+id/sort_by_web_order" android:title="網頁順序" />
-                <item android:id="@+id/sort_by_money" android:title="價格" />
+                <item android:checked="true" android:id="@+id/sort_by_money" android:title="價格" />
+                <item android:id="@+id/sort_by_web_order" android:title="網頁順序" />
                 <item android:id="@+id/sort_by_moneydiff" android:title="價格波動" />
             </group>
         </menu>
@@ -25,6 +25,7 @@
                 <item android:id="@+id/show_phone" android:title="手機" android:checked="true" />
                 <item android:id="@+id/show_pad" android:title="平板" />
                 <item android:id="@+id/show_pad_phone" android:title="手機與平板" />
+                <item android:id="@+id/show_others" android:title="其他裝置" />
                 <item android:id="@+id/show_money_diff" android:title="價格有變" />
             </group>
         </menu>

@@ -105,37 +105,6 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
     }
 
-    private Boolean isPad(String s) {
-        String upperStr = s.toUpperCase();
-
-        if (upperStr.contains("PADFONE")) {
-            return false;
-        }
-        else if (upperStr.contains("TAB") || upperStr.contains("PAD") || upperStr.contains("TABLET")) {
-            return true;
-        }
-        else if (upperStr.contains("NOKIA N1")) {
-            return true;
-        }
-        else {
-            return false;
-        }
-    }
-
-    private Boolean isOthers(String s) {
-        String upperStr = s.toUpperCase();
-
-        if (upperStr.contains("WATCH")) {
-            return true;
-        }
-        else if (upperStr.contains("R100")) {
-            return true;
-        }
-        else {
-            return false;
-        }
-    }
-
     private void parse() {
         Connection.Response response = null;
 
@@ -147,41 +116,40 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             while (response == null || response.statusCode() != 200) {
-                response = Jsoup.connect("http://www.landtop.com.tw/products.php?types=1").timeout(3000).execute();
+                response = Jsoup.connect("http://www.landtop.com.tw/landtop50.php").timeout(3000).execute();
                 Thread.sleep(1000);
             }
 
             Document doc = response.parse();
             Elements companies = doc.getElementsByTag("table");
-
             int phoneSn = 0;
 
+            /* 每家手機是一個 table */
             for (int i = 0; i < companies.size(); i++) {
-                Element company = companies.get(i);
-                Elements phones = company.getElementsByTag("tr");
+                /* 這家廠商的每一隻 */
+                Elements phones = companies.get(i).getElementsByTag("tr");
 
-                String companyPic = phones.get(0).child(0).child(1).attr("src");
+                /* 第一格是廠商的資訊 */
+                /* <tr><td><img> */
+                String companyPic = phones.get(0).child(0).child(0).attr("src");
+
                 PhoneCompany phoneCompany = PhoneCompany.getCompanyFromPicture(companyPic);
                 compsMap.put(phoneCompany.company, phoneCompany);
 
                 for (int j = 1; j < phones.size(); j++) {
                     Element phone = phones.get(j);
-                    String name = phone.child(0).child(0).child(0).text();
-                    String money = phone.child(1).text().substring(1);
+                    /* <tr>
+                    *  <td><h5><a>phone name</a></h5></td>
+                    *  <td>單機價</td>
+                    *  </tr>
+                    **/
+                    String name  = phone.child(0).child(0).child(0).text();
+                    String money = phone.child(1).text().substring(2);
 
                     sb.append(name);
                     sb.append(money);
 
                     PhonePrice pp = new PhonePrice(phoneCompany, name, money, phoneSn);
-
-                    if (isPad(name)) {
-                        pp.type = PhonePrice.Type.Tablet;
-                    } else if (isOthers(name)) {
-                        pp.type = PhonePrice.Type.Others;
-                    }
-                    else  {
-                        pp.type = PhonePrice.Type.Phone;
-                    }
 
                     phoneCompany.phones.add(pp);
                     allPhones.add(pp);
@@ -190,6 +158,7 @@ public class MainActivity extends AppCompatActivity {
                     namePriceMap.put(pp.name, pp.price);
                 }
             }
+
             checkPrevPrice(namePriceMap, stringToHash(sb.toString()));
         } catch (Exception e) {
             Log.d("PHONE", "Exception in Parse: " + e.getMessage());
@@ -355,10 +324,12 @@ public class MainActivity extends AppCompatActivity {
                 continue;
             }
 
-            HashMap<String, Object> hashMap = new HashMap<String, Object>();
-            hashMap.put("PhoneName", pp);
-            hashMap.put("PhonePrice", pp.getPriceString());
-            listForView.add(hashMap);
+            if (pp.price != Integer.MIN_VALUE) {
+                HashMap<String, Object> hashMap = new HashMap<String, Object>();
+                hashMap.put("PhoneName", pp);
+                hashMap.put("PhonePrice", pp.getPriceString());
+                listForView.add(hashMap);
+            }
         }
 
         adapter.notifyDataSetChanged();
@@ -434,11 +405,6 @@ public class MainActivity extends AppCompatActivity {
             case R.id.show_twm:
                 return showCompany(PhoneCompany.CompanyEnum.TWM);
 
-            case R.id.show_pad_phone:
-                showType = ShowType.All;
-                updateList();
-                return true;
-
             case R.id.show_pad:
                 showType = ShowType.Tablet;
                 updateList();
@@ -481,11 +447,50 @@ class PhonePrice {
         }
         id = i;
         prev_price = 0;
+
+        if (isPad(name)) {
+            type = PhonePrice.Type.Tablet;
+        } else if (isOthers(name)) {
+            type = PhonePrice.Type.Others;
+        }  else  {
+            type = PhonePrice.Type.Phone;
+        }
     }
 
     @Override
     public String toString() {
         return name;
+    }
+
+    private Boolean isPad(String s) {
+        String upperStr = s.toUpperCase();
+
+        if (upperStr.contains("PADFONE")) {
+            return false;
+        }
+        else if (upperStr.contains("TAB") || upperStr.contains("PAD") || upperStr.contains("TABLET")) {
+            return true;
+        }
+        else if (upperStr.contains("NOKIA N1")) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    private Boolean isOthers(String s) {
+        String upperStr = s.toUpperCase();
+
+        if (upperStr.contains("WATCH")) {
+            return true;
+        } else if (upperStr.contains("R100")) {
+            return true;
+        } else if (upperStr.contains("VR")) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     public String getPriceString() {

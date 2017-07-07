@@ -5,19 +5,6 @@
 
     <item
         app:showAsAction="always"
-        android:title="排序">
-
-        <menu>
-            <group android:checkableBehavior="single" android:id="@+id/group_sort">
-                <item android:checked="true" android:id="@+id/sort_by_money" android:title="價格" />
-                <item android:id="@+id/sort_by_web_order" android:title="網頁順序" />
-                <item android:id="@+id/sort_by_moneydiff" android:title="價格波動" />
-            </group>
-        </menu>
-    </item>
-
-    <item
-        app:showAsAction="always"
         android:title="顯示">
 
         <menu>
@@ -26,6 +13,7 @@
                 <item android:id="@+id/show_pad" android:title="平板" />
                 <item android:id="@+id/show_others" android:title="其他裝置" />
                 <item android:id="@+id/show_money_diff" android:title="價格有變" />
+                <item android:id="@+id/show_delete" android:title="已下架" />
             </group>
         </menu>
     </item>
@@ -36,7 +24,7 @@
 
         <menu>
             <group android:checkableBehavior="single" android:id="@+id/company">
-                <item android:id="@+id/show_all" android:title="ALL" android:checked="true" />
+                <item android:id="@+id/show_all_comp" android:title="ALL" android:checked="true" />
                 <item android:id="@+id/show_apple" android:title="APPLE" />
                 <item android:id="@+id/show_asus" android:title="ASUS" />
                 <item android:id="@+id/show_htc" android:title="hTC" />
@@ -47,8 +35,17 @@
                 <item android:id="@+id/show_huawei" android:title="HUAWEI" />
                 <item android:id="@+id/show_oppo" android:title="oppo" />
                 <item android:id="@+id/show_mi" android:title="MI" />
-                <item android:id="@+id/show_twm" android:title="TWM" />
+                <item android:id="@+id/show_moto" android:title="moto" />
+                <!-- <item android:id="@+id/show_twm" android:title="TWM" /> -->
             </group>
         </menu>
+    </item>
+
+    <item
+        android:title="設定">
+        <group>
+            <item android:id="@+id/history_size" android:title="歷史檔案大小" />
+            <item android:id="@+id/history_clear" android:title="歷史檔案刪除" />
+        </group>
     </item>
 </menu>

@@ -1,10 +1,12 @@
 package toy.james732.landtop;
 
 import android.app.AlertDialog;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -42,6 +44,14 @@ class PhonePriceHistory {
         date = d;
     }
 
+    void update_price_today(int price, Date today) {
+        if (date.equals(today)) {
+            if (price < this.price) {
+                this.price = price;
+            }
+        }
+    }
+
     int price;
     Date date;
 }
@@ -50,6 +60,15 @@ class PhoneItem {
     String companyName;
     String phoneName;
     Type type;
+    ArrayList<PhonePriceHistory> priceHistories;
+
+    enum Type {
+        None,
+        Phone,
+        Tablet,
+        Others,
+        Deleted,
+    }
 
     PhoneItem(String company, String phone, int price, Date today) {
         companyName = company;
@@ -66,13 +85,16 @@ class PhoneItem {
         return phoneName;
     }
 
-    ArrayList<PhonePriceHistory> priceHistories;
+    private PhonePriceHistory get_final_history() {
+        return priceHistories.get(priceHistories.size() - 1);
+    }
 
     int get_final_price() {
-        return priceHistories.get(priceHistories.size() - 1).price;
+        return get_final_history().price;
     }
+
     Date get_final_date() {
-        return priceHistories.get(priceHistories.size() - 1).date;
+        return get_final_history().date;
     }
 
     String getPriceString() {
@@ -108,14 +130,6 @@ class PhoneItem {
 
     }
 
-    enum Type {
-        None,
-        Phone,
-        Tablet,
-        Others,
-        Deleted,
-    }
-
     private Type check_type() {
         String upperStr = phoneName.toUpperCase();
 
@@ -135,6 +149,10 @@ class PhoneItem {
         } else {
             return Type.Phone;
         }
+    }
+
+    void check_and_update_price(int price, Date today) {
+        get_final_history().update_price_today(price, today);
     }
 }
 
@@ -188,7 +206,6 @@ public class MainActivity extends AppCompatActivity {
                     all_phone_items_map.put(item.phoneName, item);
                 }
             } catch (IOException e) {
-                /* TODO: Exception Handle? */
                 Log.d(LOG_TAG, "read_old_data : " + e.getMessage());
             }
         }
@@ -250,6 +267,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private boolean is_connected() {
+        ConnectivityManager cm = (ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = cm.getActiveNetworkInfo();
+        if (networkInfo != null && networkInfo.isConnected()) {
+            return true;
+        }
+        return false;
+    }
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -259,68 +286,73 @@ public class MainActivity extends AppCompatActivity {
         listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
 
         descript_text = (TextView)findViewById(R.id.descript_text);
-        descript_text.setText("忙碌中請稍後......");
-        is_busy = true;
 
-        HandlerThread thread = new HandlerThread("jsoup");
-        thread.start();
+        if (is_connected()) {
+            descript_text.setText("忙碌中請稍後......");
+            is_busy = true;
 
-        adapter = new SimpleAdapter(
-                getApplicationContext(),
-                listForView,
-                R.layout.list,
-                new String[]{ "PhoneName", "PhonePrice" },
-                new int[] { R.id.textView1, R.id.textView2 });
-        listView.setAdapter(adapter);
+            HandlerThread thread = new HandlerThread("jsoup");
+            thread.start();
 
-        listView.setOnItemClickListener(new ListView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                PhoneItem selectItem = currentShow.get(position);
+            adapter = new SimpleAdapter(
+                    getApplicationContext(),
+                    listForView,
+                    R.layout.list,
+                    new String[]{ "PhoneName", "PhonePrice" },
+                    new int[] { R.id.textView1, R.id.textView2 });
+            listView.setAdapter(adapter);
 
-                AlertDialog.Builder b = new AlertDialog.Builder(MainActivity.this);
-                b.setTitle(selectItem.phoneName);
+            listView.setOnItemClickListener(new ListView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    PhoneItem selectItem = currentShow.get(position);
 
-                StringBuilder sb = new StringBuilder();
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm");
+                    AlertDialog.Builder b = new AlertDialog.Builder(MainActivity.this);
+                    b.setTitle(selectItem.phoneName);
 
-                for (PhonePriceHistory history : selectItem.priceHistories) {
-                    sb.append(sdf.format(history.date));
-                    sb.append(" $ ");
-                    sb.append(history.price);
-                    sb.append("\n");
+                    StringBuilder sb = new StringBuilder();
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm");
+
+                    for (PhonePriceHistory history : selectItem.priceHistories) {
+                        sb.append(sdf.format(history.date));
+                        sb.append(" $ ");
+                        sb.append(history.price);
+                        sb.append("\n");
+                    }
+
+                    b.setMessage(sb.toString());
+                    b.create().show();
                 }
+            });
 
-                b.setMessage(sb.toString());
-                b.create().show();
-            }
-        });
-
-        listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-            @Override
-            public boolean onItemLongClick(AdapterView<?> adapterView, View view, int position, long l) {
-                view.setSelected(true);
-                return true;
-            }
-        });
+            listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+                @Override
+                public boolean onItemLongClick(AdapterView<?> adapterView, View view, int position, long l) {
+                    view.setSelected(true);
+                    return true;
+                }
+            });
 
         /* 另一個thread負責抓網頁與處理資訊 */
-        Handler threadHandler = new Handler(thread.getLooper());
-        threadHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                parse();
-                uiHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        currentShow = all_phones;
-                        updateList();
-                        adapter.notifyDataSetChanged();
-                        is_busy = false;
-                    }
-                });
-            } /* run() */
-        }); /* threadHandler.post */
+            Handler threadHandler = new Handler(thread.getLooper());
+            threadHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    parse();
+                    uiHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            currentShow = all_phones;
+                            updateList();
+                            adapter.notifyDataSetChanged();
+                            is_busy = false;
+                        }
+                    });
+                } /* run() */
+            }); /* threadHandler.post */
+        } else {
+            descript_text.setText("無網路連線...");
+        }
     } /* onCreate */
 
     @Override
@@ -338,40 +370,48 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void parse() {
-        Date today = Calendar.getInstance().getTime();
-        ArrayList<PhoneItem> phoneList = new ArrayList<>();
+    int parse_money_string(String money) {
+        if (money.equals("特價中"))
+            return -1;
 
-        compsMap.clear();
-
-        HashMap<String, PhoneItem> phoneMap = new HashMap<>();
+        if (money.startsWith("$ "))
+            money = money.replace("$ ", "");
+        else if (money.startsWith("$"))
+            money = money.replace("$", "");
 
         try {
-            Document doc = get_and_parse("http://www.landtop.com.tw/products.php?types=1");
-            Elements companies = doc.getElementsByTag("table");
+            return Integer.parseInt(money);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
+    }
 
-            for (int i = 0; i < companies.size(); i++) {
-                Element company = companies.get(i);
-                Elements phones = company.getElementsByTag("tr");
+    private void parse_products(ArrayList<PhoneItem> phoneList,
+                                HashMap<String, PhoneItem> phoneMap,
+                                Date today) throws IOException, InterruptedException {
+        Document doc = get_and_parse("http://www.landtop.com.tw/products.php?types=1");
+        Elements companies = doc.getElementsByTag("table");
 
-                String companyPic = phones.get(0).child(0).child(1).attr("src");
-                PhoneCompany phoneCompany = PhoneCompany.getCompanyFromPicture(companyPic);
-                compsMap.put(phoneCompany.companyName, phoneCompany);
+        for (int i = 0; i < companies.size(); i++) {
+            Element company = companies.get(i);
+            Elements phones = company.getElementsByTag("tr");
 
-                for (int j = 1; j < phones.size(); j++) {
-                    Element phone = phones.get(j);
-                    String name = phone.child(0).child(0).child(0).text();
-                    String money = phone.child(1).text().substring(1);
+            String companyPic = phones.get(0).child(0).child(1).attr("src");
+            PhoneCompany phoneCompany = PhoneCompany.getCompanyFromPicture(companyPic);
+            compsMap.put(phoneCompany.companyName, phoneCompany);
 
-                    int money_value;
-                    try {
-                        money_value = Integer.parseInt(money);
-                    } catch (NumberFormatException e) {
-                        Log.d(LOG_TAG, "ERR 1:" + name + "/" + money);
-                        /* 價格不是數字的，直接放棄這筆了 */
-                        continue;
-                    }
+            for (int j = 1; j < phones.size(); j++) {
+                Element phone = phones.get(j);
+                String name = phone.child(0).child(0).child(0).text();
+                String money = phone.child(1).text();
 
+                int money_value = parse_money_string(money);
+                if (money_value == -1)
+                    continue;
+
+                if (phoneMap.containsKey(name)) {
+                    phoneMap.get(name).check_and_update_price(money_value, today);
+                } else {
                     PhoneItem pi = new PhoneItem(
                             phoneCompany.companyName,
                             name,
@@ -383,81 +423,94 @@ public class MainActivity extends AppCompatActivity {
                     phoneMap.put(name, pi);
                 }
             }
+        }
+    }
 
-            doc = get_and_parse("http://www.landtop.com.tw/landtop50_new.php");
-            companies = doc.getElementsByTag("table");
+    private void parse_top50(ArrayList<PhoneItem> phoneList,
+                             HashMap<String, PhoneItem> phoneMap,
+                             Date today) throws IOException, InterruptedException {
+        Document doc = get_and_parse("http://www.landtop.com.tw/landtop50_new.php");
+        Elements companies = doc.getElementsByTag("table");
+        int reduce_diff = -1;
 
-            /* 每家手機是一個 table */
-            for (int i = 0; i < companies.size(); i++) {
-                /* 這家廠商的每一隻 */
-                Elements phones = companies.get(i).getElementsByTag("tr");
+        /* 每家手機是一個 table */
+        for (int i = 0; i < companies.size(); i++) {
+            /* 這家廠商的每一隻 */
+            Elements phones = companies.get(i).getElementsByTag("tr");
 
-                /* 第一格是廠商的資訊 */
-                /* <tr><td><img src="..."> */
-                String companyPic = phones.get(0).child(0).child(0).attr("src");
+            /* 第一格是廠商的資訊 */
+            /* <tr><td><img src="..."> */
+            String companyPic = phones.get(0).child(0).child(0).attr("src");
 
-                PhoneCompany phoneCompany = PhoneCompany.getCompanyFromPicture(companyPic);
-                if (!compsMap.containsKey(phoneCompany.companyName)) {
-                    compsMap.put(phoneCompany.companyName, phoneCompany);
-                }
+            PhoneCompany phoneCompany = PhoneCompany.getCompanyFromPicture(companyPic);
+            if (!compsMap.containsKey(phoneCompany.companyName)) {
+                compsMap.put(phoneCompany.companyName, phoneCompany);
+            }
 
-                for (int j = 1; j < phones.size(); j++) {
-                    Element phone = phones.get(j);
+            for (int j = 1; j < phones.size(); j++) {
+                Element phone = phones.get(j);
                     /* <tr>
                     *  <td><h5><a>phone name</a></h5></td>
                     *  <td>單機價</td>
                     *  </tr>
                     **/
-                    String name  = phone.child(0).child(0).child(0).text();
-                    String money = phone.child(1).text().substring(2);
+                String name  = phone.child(0).child(0).child(0).text();
+                String money = phone.child(1).text();
+                String reduce = phone.child(2).text();
 
-                    int money_value;
-                    try {
-                        money_value = Integer.parseInt(money);
-                    } catch (NumberFormatException e) {
-                        Log.d(LOG_TAG, "ERR 2:" + name + "/" + money);
-                        /* 價格不是數字的，直接放棄這筆了 */
-                        continue;
-                    }
+                int money_value = parse_money_string(money);
+                int reduce_value = parse_money_string(reduce);
 
-                    if (phoneMap.containsKey(name)) {
-                        /* 已經存在這一筆資料 */
-                        int p = phoneMap.get(name).get_final_price();
-                        if (p != money_value)
-                            Log.d(LOG_TAG, "ERR 3:" + name + "/" + money + "/" + p);
-                    } else {
-                        PhoneItem pi = new PhoneItem(
-                                phoneCompany.companyName,
-                                name,
-                                money_value,
-                                today
-                        );
+                if (reduce_diff == -1) {
+                    if (money_value != -1 && reduce_value != -1)
+                        reduce_diff = money_value - reduce_value;
+                }
 
-                        phoneList.add(pi);
-                    }
+                if (money_value == -1 && reduce_value != 0 && reduce_diff != -1) {
+                    money_value = reduce_value + reduce_diff;
+                }
+                if (money_value == -1)
+                    continue;
+
+                if (phoneMap.containsKey(name)) {
+                    /* 已經存在這一筆資料 */
+                    phoneMap.get(name).check_and_update_price(money_value, today);
+                } else {
+                    PhoneItem pi = new PhoneItem(
+                            phoneCompany.companyName,
+                            name,
+                            money_value,
+                            today
+                    );
+
+                    phoneList.add(pi);
                 }
             }
+        }
+    }
 
+    private void parse() {
+        Date today = Calendar.getInstance().getTime();
+        ArrayList<PhoneItem> phoneList = new ArrayList<>();
+
+        compsMap.clear();
+
+        HashMap<String, PhoneItem> phoneMap = new HashMap<>();
+
+        try {
+            parse_products(phoneList, phoneMap, today);
+            parse_top50(phoneList, phoneMap, today);
             updateNewPhone(phoneList, today);
-            updateList();
         } catch (Exception e) {
             Log.d(LOG_TAG, "Exception in Parse: " + e.getMessage());
             Log.d(LOG_TAG, Log.getStackTraceString(e));
         }
     } /* parse() */
 
-    private void updateNewPhone(ArrayList<PhoneItem> phoneList, Date today) {
-        HashMap<String, PhoneItem> new_phone_map = new HashMap<>();
-        read_old_data();
-
-        /* 分類 */
-        all_phones  = new ArrayList<>();
-        all_tablet  = new ArrayList<>();
-        all_others  = new ArrayList<>();
-        all_items   = new ArrayList<>();
-        all_deleted = new ArrayList<>();
-
+    private void update_new_phones(ArrayList<PhoneItem> phoneList, Date today) {
         if (all_phone_items_map.size() != 0) {
+            HashMap<String, PhoneItem> new_phone_map = new HashMap<>();
+
             for (PhoneItem new_item : phoneList) {
                 String name = new_item.phoneName;
 
@@ -521,6 +574,19 @@ public class MainActivity extends AppCompatActivity {
             }
             save_all_data();
         }
+    }
+
+    private void updateNewPhone(ArrayList<PhoneItem> phoneList, Date today) {
+        read_old_data();
+
+        /* 分類 */
+        all_phones  = new ArrayList<>();
+        all_tablet  = new ArrayList<>();
+        all_others  = new ArrayList<>();
+        all_items   = new ArrayList<>();
+        all_deleted = new ArrayList<>();
+
+        update_new_phones(phoneList, today);
 
         for (PhoneItem pi : all_phone_items_map.values()) {
             switch (pi.type) {
@@ -577,7 +643,11 @@ public class MainActivity extends AppCompatActivity {
                 sb.append("其他");
             }
 
-            currentShow.clear();
+            if (currentShow == null)
+                currentShow = new ArrayList<>();
+            else
+                currentShow.clear();
+
             for (PhoneItem pi : tmpList) {
                 if (pi.type == showType) {
                     currentShow.add(pi);

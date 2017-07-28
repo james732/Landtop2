@@ -22,7 +22,7 @@
         app:showAsAction="always"
         android:title="廠牌">
 
-        <menu>
+        <menu android:id="@+id/company_menu">
             <group android:checkableBehavior="single" android:id="@+id/company">
                 <item android:id="@+id/show_all_comp" android:title="ALL" android:checked="true" />
                 <item android:id="@+id/show_apple" android:title="APPLE" />
@@ -36,6 +36,9 @@
                 <item android:id="@+id/show_oppo" android:title="oppo" />
                 <item android:id="@+id/show_mi" android:title="MI" />
                 <item android:id="@+id/show_moto" android:title="moto" />
+                <item android:id="@+id/show_google" android:title="google" />
+                <item android:id="@+id/show_blackberry" android:title="Blackberry" />
+                <item android:id="@+id/show_oneplus" android:title="OnePlus" />
                 <!-- <item android:id="@+id/show_twm" android:title="TWM" /> -->
             </group>
         </menu>

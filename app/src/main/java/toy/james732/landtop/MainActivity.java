@@ -7,7 +7,6 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -57,8 +56,8 @@ class PhonePriceHistory {
 }
 
 class PhoneItem {
-    String companyName;
-    String phoneName;
+    PhoneCompany company;
+    String name;
     Type type;
     ArrayList<PhonePriceHistory> priceHistories;
 
@@ -70,9 +69,9 @@ class PhoneItem {
         Deleted,
     }
 
-    PhoneItem(String company, String phone, int price, Date today) {
-        companyName = company;
-        phoneName = phone;
+    PhoneItem(PhoneCompany company, String name, int price, Date today) {
+        this.company = company;
+        this.name = name;
 
         priceHistories = new ArrayList<>();
         priceHistories.add(new PhonePriceHistory(price, today));
@@ -82,7 +81,7 @@ class PhoneItem {
 
     @Override
     public String toString() {
-        return phoneName;
+        return name;
     }
 
     private PhonePriceHistory get_final_history() {
@@ -131,7 +130,7 @@ class PhoneItem {
     }
 
     private Type check_type() {
-        String upperStr = phoneName.toUpperCase();
+        String upperStr = name.toUpperCase();
 
         if (upperStr.contains("PADFONE")) {
             return Type.Phone;
@@ -156,211 +155,18 @@ class PhoneItem {
     }
 }
 
-public class MainActivity extends AppCompatActivity {
-    private final String LOG_TAG = "LANDTOP";
-    private final String ALL_PHONE_FILE_NAME = "landtop_V2.txt";
+abstract class ParserBase {
+    ArrayList<PhoneItem> phone_list = new ArrayList<>();
+    private HashMap<String, PhoneItem> phone_map = new HashMap<>();
+    private Date today;
 
-    /* 儲存所有手機，包括歷史的記錄 */
-    private HashMap<String, PhoneItem> all_phone_items_map = new HashMap<>();
-
-    /* 差異記錄 */
-    private ArrayList<PhoneItem> diff_list = new ArrayList<>();
-
-    private Handler uiHandler = new Handler();
-
-    private HashMap<String, PhoneCompany> compsMap = new HashMap<>();
-    ArrayList<HashMap<String, Object>> listForView = new ArrayList<>();
-    ArrayList<PhoneItem> all_phones;
-    ArrayList<PhoneItem> all_tablet;
-    ArrayList<PhoneItem> all_others;
-    ArrayList<PhoneItem> all_items;
-    ArrayList<PhoneItem> all_deleted;
-    ArrayList<PhoneItem> currentShow;
-    SimpleAdapter adapter;
-
-    boolean is_busy;
-    TextView descript_text;
-
-    PhoneItem.Type showType = PhoneItem.Type.Phone;
-    String showCompany = "";
-
-    /* read old data from json file to 'all_phone_items_map' list */
-    void read_old_data() {
-        File path = getFilesDir();
-        File file = new File(path, ALL_PHONE_FILE_NAME);
-
-        if (file.exists() && !file.isDirectory()) {
-            PhoneItem[] item_array = null;
-            try {
-                BufferedReader reader = new BufferedReader(new FileReader(file));
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
-                }
-                String json = sb.toString();
-                item_array = new Gson().fromJson(
-                        json, PhoneItem[].class);
-
-                for (PhoneItem item : item_array) {
-                    all_phone_items_map.put(item.phoneName, item);
-                }
-            } catch (IOException e) {
-                Log.d(LOG_TAG, "read_old_data : " + e.getMessage());
-            }
-        }
+    ParserBase(Date today) {
+        this.today = today;
     }
 
-    void save_all_data() {
-        File path = getFilesDir();
-        File file = new File(path, ALL_PHONE_FILE_NAME);
+    abstract ArrayList<PhoneItem> parse() throws IOException, InterruptedException;
 
-        if (file.exists())
-            file.delete();
-
-        PhoneItem[] item_array = all_phone_items_map.values().toArray(
-                new PhoneItem[all_phone_items_map.values().size()]
-        );
-
-        try {
-            String json = new Gson().toJson(item_array);
-            FileOutputStream o = new FileOutputStream(file);
-            o.write(json.getBytes());
-            o.close();
-        } catch (IOException e) {
-            Log.d(LOG_TAG, "save_all_data : " + e.getMessage());
-        }
-    }
-
-    void show_history_size() {
-        File path = getFilesDir();
-        File file = new File(path, ALL_PHONE_FILE_NAME);
-
-        AlertDialog.Builder b = new AlertDialog.Builder(MainActivity.this);
-        b.setTitle("歷史檔案大小");
-
-        if (file.exists()) {
-            long size = file.length();
-
-            b.setMessage(new StringBuilder()
-                .append(size)
-                .append(" byte\n")
-                .append(Double.toString(size / 1024.0))
-                .append(" KB\n")
-                .append(Double.toString(size / 1024.0 / 1024.0))
-                .append(" MB\n").toString());
-        } else {
-            b.setMessage("歷史檔案不存在");
-        }
-        b.show();
-    }
-
-    void delete_history() {
-        File path = getFilesDir();
-        File file = new File(path, ALL_PHONE_FILE_NAME);
-
-        if (file.exists()) {
-            file.delete();
-            Toast.makeText(this, "歷史資訊已刪除", Toast.LENGTH_LONG).show();
-        } else {
-            Toast.makeText(this, "沒有歷史資訊", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    private boolean is_connected() {
-        ConnectivityManager cm = (ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
-        NetworkInfo networkInfo = cm.getActiveNetworkInfo();
-        if (networkInfo != null && networkInfo.isConnected()) {
-            return true;
-        }
-        return false;
-    }
-
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-
-        final ListView listView = (ListView)findViewById(R.id.myListView);
-        listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
-
-        descript_text = (TextView)findViewById(R.id.descript_text);
-
-        if (is_connected()) {
-            descript_text.setText("忙碌中請稍後......");
-            is_busy = true;
-
-            HandlerThread thread = new HandlerThread("jsoup");
-            thread.start();
-
-            adapter = new SimpleAdapter(
-                    getApplicationContext(),
-                    listForView,
-                    R.layout.list,
-                    new String[]{ "PhoneName", "PhonePrice" },
-                    new int[] { R.id.textView1, R.id.textView2 });
-            listView.setAdapter(adapter);
-
-            listView.setOnItemClickListener(new ListView.OnItemClickListener() {
-                @Override
-                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                    PhoneItem selectItem = currentShow.get(position);
-
-                    AlertDialog.Builder b = new AlertDialog.Builder(MainActivity.this);
-                    b.setTitle(selectItem.phoneName);
-
-                    StringBuilder sb = new StringBuilder();
-                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm");
-
-                    for (PhonePriceHistory history : selectItem.priceHistories) {
-                        sb.append(sdf.format(history.date));
-                        sb.append(" $ ");
-                        sb.append(history.price);
-                        sb.append("\n");
-                    }
-
-                    b.setMessage(sb.toString());
-                    b.create().show();
-                }
-            });
-
-            listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-                @Override
-                public boolean onItemLongClick(AdapterView<?> adapterView, View view, int position, long l) {
-                    view.setSelected(true);
-                    return true;
-                }
-            });
-
-        /* 另一個thread負責抓網頁與處理資訊 */
-            Handler threadHandler = new Handler(thread.getLooper());
-            threadHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    parse();
-                    uiHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            currentShow = all_phones;
-                            updateList();
-                            adapter.notifyDataSetChanged();
-                            is_busy = false;
-                        }
-                    });
-                } /* run() */
-            }); /* threadHandler.post */
-        } else {
-            descript_text.setText("無網路連線...");
-        }
-    } /* onCreate */
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-    }
-
-    Document get_and_parse(String url) throws IOException, InterruptedException {
+    protected Document get_and_parse(String url) throws IOException, InterruptedException {
         Connection.Response response = null;
         while (true) {
             response = Jsoup.connect(url).execute();
@@ -370,7 +176,107 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    int parse_money_string(String money) {
+    protected void check_add_phone(String name,
+                                 int money_value,
+                                 PhoneCompany phone_company) {
+        if (phone_map.containsKey(name)) {
+            phone_map.get(name).check_and_update_price(money_value, today);
+        } else {
+            PhoneItem pi = new PhoneItem(
+                    phone_company,
+                    name,
+                    money_value,
+                    today
+            );
+
+            phone_list.add(pi);
+            phone_map.put(name, pi);
+        }
+    }
+}
+
+class ExpansysParser extends ParserBase {
+    public ExpansysParser(Date today) {
+        super(today);
+    }
+
+    @Override
+    ArrayList<PhoneItem> parse() throws IOException, InterruptedException {
+        parse_expansys();
+        return phone_list;
+    }
+
+    private void parse_expansys_doc(Document doc) {
+        Elements products = doc.select("div.productGrid").select("ul");
+
+        for (int i = 0; i < products.size(); i++) {
+            String name = products.get(i).select("li.title").text();
+            String price = products.get(i).select("li.price").text();
+
+            int first_space = name.indexOf(' ');
+            String company_name = name.substring(0, first_space);
+            String phone_name = name.substring(first_space + 1);
+
+            if (company_name.equals("B-Stock")) {
+                first_space = phone_name.indexOf(' ');
+                company_name = phone_name.substring(0, first_space);
+                phone_name = phone_name.substring(first_space + 1) + " [B-Stock]";
+            }
+
+            PhoneCompany phone_company = PhoneCompany.get_company_by_name(company_name);
+
+            int price_value = 0;
+            try {
+                String s = price.replace("NT$", "").replace(",", "");
+                price_value = Integer.parseInt(s);
+            } catch (NumberFormatException e) {
+
+            }
+            check_add_phone(phone_name, price_value, phone_company);
+        }
+    }
+
+    private int get_expansys_phone_pages() throws IOException, InterruptedException {
+        Document doc = get_and_parse("http://www.expansys-tw.com/mobile-phones/");
+        String s = doc.select("li.showing").text();
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '頁')
+                break;
+            sb.append(c);
+        }
+        parse_expansys_doc(doc);
+        return Integer.parseInt(sb.toString());
+    }
+
+    private void parse_expansys_page(int page) throws IOException, InterruptedException {
+        Document doc = get_and_parse("http://www.expansys-tw.com/mobile-phones/?page=" + String.valueOf(page));
+        parse_expansys_doc(doc);
+    }
+
+    private void parse_expansys() throws IOException, InterruptedException {
+        int pages = get_expansys_phone_pages();
+        for (int i = 0; i < pages; i++) {
+            parse_expansys_page(i + 1);
+        }
+    }
+}
+
+class LandtopParser extends ParserBase {
+    LandtopParser(Date today) {
+        super(today);
+    }
+
+    @Override
+    ArrayList<PhoneItem> parse() throws IOException, InterruptedException {
+        parse_products();
+        parse_top50();
+        return phone_list;
+    }
+
+    private int parse_money_string(String money) {
         if (money.equals("特價中"))
             return -1;
 
@@ -386,9 +292,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void parse_products(ArrayList<PhoneItem> phoneList,
-                                HashMap<String, PhoneItem> phoneMap,
-                                Date today) throws IOException, InterruptedException {
+    private void parse_products() throws IOException, InterruptedException {
         Document doc = get_and_parse("http://www.landtop.com.tw/products.php?types=1");
         Elements companies = doc.getElementsByTag("table");
 
@@ -396,9 +300,8 @@ public class MainActivity extends AppCompatActivity {
             Element company = companies.get(i);
             Elements phones = company.getElementsByTag("tr");
 
-            String companyPic = phones.get(0).child(0).child(1).attr("src");
-            PhoneCompany phoneCompany = PhoneCompany.getCompanyFromPicture(companyPic);
-            compsMap.put(phoneCompany.companyName, phoneCompany);
+            String company_pic = phones.get(0).child(0).child(1).attr("src");
+            PhoneCompany phone_company = PhoneCompany.getCompanyFromPicture(company_pic);
 
             for (int j = 1; j < phones.size(); j++) {
                 Element phone = phones.get(j);
@@ -409,26 +312,12 @@ public class MainActivity extends AppCompatActivity {
                 if (money_value == -1)
                     continue;
 
-                if (phoneMap.containsKey(name)) {
-                    phoneMap.get(name).check_and_update_price(money_value, today);
-                } else {
-                    PhoneItem pi = new PhoneItem(
-                            phoneCompany.companyName,
-                            name,
-                            money_value,
-                            today
-                    );
-
-                    phoneList.add(pi);
-                    phoneMap.put(name, pi);
-                }
+                check_add_phone(name, money_value, phone_company);
             }
         }
     }
 
-    private void parse_top50(ArrayList<PhoneItem> phoneList,
-                             HashMap<String, PhoneItem> phoneMap,
-                             Date today) throws IOException, InterruptedException {
+    private void parse_top50() throws IOException, InterruptedException {
         Document doc = get_and_parse("http://www.landtop.com.tw/landtop50_new.php");
         Elements companies = doc.getElementsByTag("table");
         int reduce_diff = -1;
@@ -443,9 +332,6 @@ public class MainActivity extends AppCompatActivity {
             String companyPic = phones.get(0).child(0).child(0).attr("src");
 
             PhoneCompany phoneCompany = PhoneCompany.getCompanyFromPicture(companyPic);
-            if (!compsMap.containsKey(phoneCompany.companyName)) {
-                compsMap.put(phoneCompany.companyName, phoneCompany);
-            }
 
             for (int j = 1; j < phones.size(); j++) {
                 Element phone = phones.get(j);
@@ -472,47 +358,159 @@ public class MainActivity extends AppCompatActivity {
                 if (money_value == -1)
                     continue;
 
-                if (phoneMap.containsKey(name)) {
-                    /* 已經存在這一筆資料 */
-                    phoneMap.get(name).check_and_update_price(money_value, today);
-                } else {
-                    PhoneItem pi = new PhoneItem(
-                            phoneCompany.companyName,
-                            name,
-                            money_value,
-                            today
-                    );
+                check_add_phone(name, money_value, phoneCompany);
+            }
+        }
+    }
+}
 
-                    phoneList.add(pi);
+class AllPhones
+{
+    enum CompareResult {
+        NoOldData,
+        NoUpdated,
+        Updated,
+        Error,
+    }
+
+    private final String ALL_PHONE_FILE_NAME = "landtop_V2.txt";
+    private File file_path;
+
+    private CompareResult result;
+
+    private Date today = Calendar.getInstance().getTime();
+    private ArrayList<PhoneItem> all_items = new ArrayList<>();
+    private ArrayList<PhoneItem> diff_list = new ArrayList<>();
+
+    private ArrayList<PhoneItem> get_by_type(ArrayList<PhoneItem> items, PhoneItem.Type type) {
+        if (items == null)
+            return null;
+
+        ArrayList<PhoneItem> ret_items = new ArrayList<>();
+
+        for (PhoneItem pi : items) {
+            if (pi.type == type) {
+                ret_items.add(pi);
+            }
+        }
+
+        return ret_items;
+    }
+
+    public ArrayList<PhoneItem> get_by_type(PhoneItem.Type type) {
+        return get_by_type(all_items, type);
+    }
+
+    public ArrayList<PhoneItem> get_all_items() {
+        return all_items;
+    }
+
+    public ArrayList<PhoneItem> get_by_company(PhoneCompany company, PhoneItem.Type type) {
+        ArrayList<PhoneItem> item;
+
+        if (company_phone_map.containsKey(company))
+            item = company_phone_map.get(company);
+        else
+            return null;
+
+        return get_by_type(item, type);
+    }
+
+    public ArrayList<PhoneItem> get_diff_list() { return diff_list; }
+
+    /* 儲存所有手機，包括歷史的記錄 */
+    private HashMap<String, PhoneItem> all_phone_items_map = new HashMap<>();
+
+    private HashMap<PhoneCompany, ArrayList<PhoneItem>> company_phone_map = new HashMap<>();
+
+    public AllPhones(File file_path)
+    {
+        ArrayList<PhoneItem> new_phone_items = null;
+        this.file_path = file_path;
+
+        ParserBase parser = new LandtopParser(today);
+        // ParserBase parser = new ExpansysParser(today);
+        try {
+            new_phone_items = parser.parse();
+            read_and_update(new_phone_items);
+        } catch (Exception e) {
+
+        }
+    }
+
+    public CompareResult get_result() {
+        return result;
+    }
+
+    public long get_history_size() {
+        File file = new File(file_path, ALL_PHONE_FILE_NAME);
+        if (file.exists())
+            return file.length();
+        else
+            return -1;
+    }
+
+    boolean delete_history() {
+        File file = new File(file_path, ALL_PHONE_FILE_NAME);
+
+        if (file.exists()) {
+            file.delete();
+            return true;
+        } else {
+            return false;
+        }
+    }
+    
+    /* read old data from json file to 'all_phone_items_map' list */
+    private void read_old_data() {
+        File file = new File(file_path, ALL_PHONE_FILE_NAME);
+
+        if (file.exists() && !file.isDirectory()) {
+            PhoneItem[] item_array = null;
+            try {
+                BufferedReader reader = new BufferedReader(new FileReader(file));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    sb.append(line);
                 }
+                String json = sb.toString();
+                item_array = new Gson().fromJson(
+                        json, PhoneItem[].class);
+
+                for (PhoneItem item : item_array) {
+                    all_phone_items_map.put(item.name, item);
+                }
+            } catch (IOException e) {
             }
         }
     }
 
-    private void parse() {
-        Date today = Calendar.getInstance().getTime();
-        ArrayList<PhoneItem> phoneList = new ArrayList<>();
+    private void save_all_data() {
+        File file = new File(file_path, ALL_PHONE_FILE_NAME);
 
-        compsMap.clear();
+        if (file.exists())
+            file.delete();
 
-        HashMap<String, PhoneItem> phoneMap = new HashMap<>();
+        PhoneItem[] item_array = all_phone_items_map.values().toArray(
+                new PhoneItem[all_phone_items_map.values().size()]
+        );
 
         try {
-            parse_products(phoneList, phoneMap, today);
-            parse_top50(phoneList, phoneMap, today);
-            updateNewPhone(phoneList, today);
-        } catch (Exception e) {
-            Log.d(LOG_TAG, "Exception in Parse: " + e.getMessage());
-            Log.d(LOG_TAG, Log.getStackTraceString(e));
+            String json = new Gson().toJson(item_array);
+            FileOutputStream o = new FileOutputStream(file);
+            o.write(json.getBytes());
+            o.close();
+        } catch (IOException e) {
         }
-    } /* parse() */
+    }
 
-    private void update_new_phones(ArrayList<PhoneItem> phoneList, Date today) {
+    private void compare_old_phones(ArrayList<PhoneItem> phoneList) {
         if (all_phone_items_map.size() != 0) {
             HashMap<String, PhoneItem> new_phone_map = new HashMap<>();
 
             for (PhoneItem new_item : phoneList) {
-                String name = new_item.phoneName;
+                String name = new_item.name;
 
                 if (all_phone_items_map.containsKey(name)) {
                     PhoneItem old_item;
@@ -552,120 +550,219 @@ public class MainActivity extends AppCompatActivity {
             for (String s : all_phone_items_map.keySet()) {
                 PhoneItem item = all_phone_items_map.get(s);
                 if (item.get_final_price() == -1) {
-                    all_deleted.add(item);
+                    item.type = PhoneItem.Type.Deleted;
                 }
             }
 
             all_phone_items_map = new_phone_map;
 
             if (diff_list.size() != 0) {
-                Toast.makeText(this, "網頁有更新", Toast.LENGTH_LONG).show();
+                result = CompareResult.Updated;
                 save_all_data();
-
-                /* 如果網頁有更新，就只先顯示有改變的列表 */
-                showType = PhoneItem.Type.None;
             } else {
-                Toast.makeText(this, "網頁沒有更新", Toast.LENGTH_LONG).show();
+                result = CompareResult.NoUpdated;
             }
         } else /* if (all_phone_items_map.size() == 0) */ {
-            Toast.makeText(this, "初次執行", Toast.LENGTH_LONG).show();
+            result = CompareResult.NoOldData;
             for (PhoneItem pi : phoneList) {
-                all_phone_items_map.put(pi.phoneName, pi);
+                all_phone_items_map.put(pi.name, pi);
             }
             save_all_data();
         }
     }
 
-    private void updateNewPhone(ArrayList<PhoneItem> phoneList, Date today) {
+    private void read_and_update(ArrayList<PhoneItem> phoneList) {
         read_old_data();
-
-        /* 分類 */
-        all_phones  = new ArrayList<>();
-        all_tablet  = new ArrayList<>();
-        all_others  = new ArrayList<>();
-        all_items   = new ArrayList<>();
-        all_deleted = new ArrayList<>();
-
-        update_new_phones(phoneList, today);
+        compare_old_phones(phoneList);
 
         for (PhoneItem pi : all_phone_items_map.values()) {
-            switch (pi.type) {
-                case Phone:
-                    all_phones.add(pi);
-                    break;
-
-                case Tablet:
-                    all_tablet.add(pi);
-                    break;
-
-                case Others:
-                    all_others.add(pi);
-                    break;
-            }
             all_items.add(pi);
 
-            if (compsMap.containsKey(pi.companyName))
-                compsMap.get(pi.companyName).phones.add(pi);
-            else
-                compsMap.get(PhoneCompany.UNKNOWN).phones.add(pi);
+            if (!company_phone_map.containsKey(pi.company))
+                company_phone_map.put(pi.company, new ArrayList<PhoneItem>());
+            company_phone_map.get(pi.company).add(pi);
         }
+    }
+}
+
+public class MainActivity extends AppCompatActivity {
+    private final String LOG_TAG = "LANDTOP";
+
+    private Handler uiHandler = new Handler();
+
+    ArrayList<HashMap<String, Object>> listForView = new ArrayList<>();
+    ArrayList<PhoneItem> current_show;
+    SimpleAdapter adapter;
+
+    boolean is_busy;
+    TextView descript_text;
+
+    PhoneItem.Type show_type = PhoneItem.Type.Phone;
+    PhoneCompany show_company = null;
+
+    AllPhones all_phones;
+
+    private boolean is_connected() {
+        ConnectivityManager cm = (ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
+        NetworkInfo networkInfo = cm.getActiveNetworkInfo();
+        if (networkInfo != null && networkInfo.isConnected()) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        final ListView listView = (ListView)findViewById(R.id.myListView);
+        listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
+
+        descript_text = (TextView)findViewById(R.id.descript_text);
+
+        if (is_connected()) {
+            descript_text.setText("忙碌中請稍後......");
+            is_busy = true;
+
+            adapter = new SimpleAdapter(
+                    getApplicationContext(),
+                    listForView,
+                    R.layout.list,
+                    new String[]{ "PhoneName", "PhonePrice" },
+                    new int[] { R.id.textView1, R.id.textView2 });
+            listView.setAdapter(adapter);
+
+            listView.setOnItemClickListener(new ListView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                    PhoneItem selectItem = current_show.get(position);
+
+                    AlertDialog.Builder b = new AlertDialog.Builder(MainActivity.this);
+                    b.setTitle(selectItem.name);
+
+                    StringBuilder sb = new StringBuilder();
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm");
+
+                    for (PhonePriceHistory history : selectItem.priceHistories) {
+                        sb.append(sdf.format(history.date));
+                        sb.append(" $ ");
+                        sb.append(history.price);
+                        sb.append("\n");
+                    }
+
+                    b.setMessage(sb.toString());
+                    b.create().show();
+                }
+            });
+
+            listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+                @Override
+                public boolean onItemLongClick(AdapterView<?> adapterView, View view, int position, long l) {
+                    view.setSelected(true);
+                    return true;
+                }
+            });
+
+            /* 另一個thread負責抓網頁與處理資訊 */
+            HandlerThread thread = new HandlerThread("jsoup");
+            thread.start();
+
+            Handler threadHandler = new Handler(thread.getLooper());
+            threadHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    all_phones = new AllPhones(getFilesDir());
+                    uiHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            switch (all_phones.get_result()) {
+                                case NoOldData:
+                                    show_toast("初次執行");
+                                    break;
+                                case Updated:
+                                    show_toast("網頁有更新");
+                                    show_type = PhoneItem.Type.None;
+                                    break;
+                                case NoUpdated:
+                                    show_toast("網頁沒有更新");
+                                    break;
+                                case Error:
+                                    show_toast("發生錯誤");
+                                    break;
+                            }
+
+                            /* currentShow = all_phones; */
+                            update_list();
+                            adapter.notifyDataSetChanged();
+                            is_busy = false;
+                        }
+                    });
+                } /* run() */
+            }); /* threadHandler.post */
+        } else {
+            descript_text.setText("無網路連線...");
+        }
+    } /* onCreate */
+
+    @Override
+    protected void onStop() {
+        super.onStop();
     }
 
     private int IntegerCompare(int x, int y) {
         return (x < y) ? -1 : ((x == y) ? 0 : 1);
     }
 
-    private void updateList() {
+    private void update_list() {
         StringBuilder sb = new StringBuilder();
-        ArrayList<PhoneItem> tmpList;
+        ArrayList<PhoneItem> tmp_list;
         boolean sort_by_money = true;
 
-        if (showType == PhoneItem.Type.Deleted) {
+        if (show_type == PhoneItem.Type.Deleted) {
             sb.append("已下架: ");
-            sb.append(all_deleted.size());
-            currentShow = new ArrayList<>(all_deleted);
+            tmp_list = all_phones.get_by_type(PhoneItem.Type.Deleted);
+            sb.append(tmp_list.size());
+            current_show = new ArrayList<>(tmp_list);
             sort_by_money = false;
-        } else if (showType != PhoneItem.Type.None) {
-            if (compsMap.containsKey(showCompany)) {
-                tmpList = compsMap.get(showCompany).phones;
-                sb.append(showCompany);
-            }  else {
-                tmpList = all_items;
+        } else if (show_type != PhoneItem.Type.None) {
+            if (show_company == null) {
+                tmp_list = all_phones.get_by_type(show_type);
                 sb.append("所有廠牌");
+            }
+            else {
+                tmp_list = all_phones.get_by_company(show_company, show_type);
+                sb.append(show_company.name);
             }
 
             sb.append(" 的 ");
-            if (showType == PhoneItem.Type.Phone) {
+            if (show_type == PhoneItem.Type.Phone) {
                 sb.append("手機");
-            } else if (showType == PhoneItem.Type.Tablet) {
+            } else if (show_type == PhoneItem.Type.Tablet) {
                 sb.append("平板");
             } else {
                 sb.append("其他");
             }
 
-            if (currentShow == null)
-                currentShow = new ArrayList<>();
+            if (current_show == null)
+                current_show = new ArrayList<>();
             else
-                currentShow.clear();
+                current_show.clear();
 
-            for (PhoneItem pi : tmpList) {
-                if (pi.type == showType) {
-                    currentShow.add(pi);
-                }
-            }
+            current_show = new ArrayList<>(tmp_list);
         } else {
             sb.append("價格有變");
-            currentShow = new ArrayList<>(diff_list);
+            current_show = new ArrayList<>(all_phones.get_diff_list());
         }
         if (sort_by_money) {
-            Collections.sort(currentShow, new Comparator<PhoneItem>() {
+            Collections.sort(current_show, new Comparator<PhoneItem>() {
                 @Override
                 public int compare(PhoneItem lhs, PhoneItem rhs) {
                     return IntegerCompare(rhs.get_final_price(), lhs.get_final_price());
                 }
             });
         } else {
-            Collections.sort(currentShow, new Comparator<PhoneItem>() {
+            Collections.sort(current_show, new Comparator<PhoneItem>() {
                 @Override
                 public int compare(PhoneItem lhs, PhoneItem rhs) {
                     return lhs.get_final_date().after(rhs.get_final_date()) ? 1 : -1;
@@ -675,13 +772,13 @@ public class MainActivity extends AppCompatActivity {
 
         listForView.clear();
 
-        for (PhoneItem pp : currentShow) {
+        for (PhoneItem pp : current_show) {
             HashMap<String, Object> hashMap = new HashMap<>();
 
-            if (showCompany.equals(""))
-                hashMap.put("PhoneName", pp.companyName + " " + pp.phoneName);
+            if (show_company == null)
+                hashMap.put("PhoneName", pp.company.name + " " + pp.name);
             else
-                hashMap.put("PhoneName", pp.phoneName);
+                hashMap.put("PhoneName", pp.name);
 
             hashMap.put("PhonePrice", pp.getPriceString());
             listForView.add(hashMap);
@@ -700,6 +797,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
+        super.onCreateOptionsMenu(menu);
 /*
         MenuItem item = menu.findItem(R.id.show_money_diff);
 
@@ -711,7 +809,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 */
-        return super.onCreateOptionsMenu(menu);
+        return true;
     }
 
     @Override
@@ -727,88 +825,103 @@ public class MainActivity extends AppCompatActivity {
 
         switch (id) {
             case R.id.show_all_comp:
-                showCompany = "";
-                updateList();
+                show_company = null;
+                update_list();
                 return true;
 
             case R.id.show_apple:
-                showCompany = PhoneCompany.APPLE;
-                updateList();
+                show_company = PhoneCompany.Apple;
+                update_list();
                 return true;
 
             case R.id.show_asus:
-                showCompany = PhoneCompany.ASUS;
-                updateList();
+                show_company = PhoneCompany.ASUS;
+                update_list();
                 return true;
 
             case R.id.show_htc:
-                showCompany = PhoneCompany.HTC;
-                updateList();
+                show_company = PhoneCompany.HTC;
+                update_list();
                 return true;
 
             case R.id.show_lg:
-                showCompany = PhoneCompany.LG;
-                updateList();
+                show_company = PhoneCompany.LG;
+                update_list();
                 return true;
 
             case R.id.show_samsung:
-                showCompany = PhoneCompany.SAMSUNG;
-                updateList();
+                show_company = PhoneCompany.SAMSUNG;
+                update_list();
                 return true;
 
             case R.id.show_sony:
-                showCompany = PhoneCompany.SONY;
-                updateList();
+                show_company = PhoneCompany.Sony;
+                update_list();
                 return true;
 
             case R.id.show_infocus:
-                showCompany = PhoneCompany.INFOCUS;
-                updateList();
+                show_company = PhoneCompany.INFOCUS;
+                update_list();
                 return true;
 
             case R.id.show_huawei:
-                showCompany = PhoneCompany.HUAWEI;
-                updateList();
+                show_company = PhoneCompany.HUAWEI;
+                update_list();
                 return true;
 
             case R.id.show_oppo:
-                showCompany = PhoneCompany.OPPO;
-                updateList();
+                show_company = PhoneCompany.OPPO;
+                update_list();
                 return true;
 
             case R.id.show_mi:
-                showCompany = PhoneCompany.MI;
-                updateList();
+                show_company = PhoneCompany.MI;
+                update_list();
                 return true;
 
             case R.id.show_moto:
-                showCompany = PhoneCompany.MOTO;
-                updateList();
+                show_company = PhoneCompany.MOTO;
+                update_list();
+                return true;
+
+            case R.id.show_google:
+                show_company = PhoneCompany.Google;
+                update_list();
+                return true;
+
+            case R.id.show_blackberry:
+                show_company = PhoneCompany.Blackberry;
+                update_list();
+                return true;
+
+            case R.id.show_oneplus:
+                show_company = PhoneCompany.OnePlus;
+                update_list();
                 return true;
 
             case R.id.show_pad:
-                showType = PhoneItem.Type.Tablet;
-                updateList();
+                show_type = PhoneItem.Type.Tablet;
+                update_list();
                 return true;
 
             case R.id.show_phone:
-                showType = PhoneItem.Type.Phone;
-                updateList();
+                show_type = PhoneItem.Type.Phone;
+                update_list();
                 return true;
 
             case R.id.show_money_diff:
-                showType = PhoneItem.Type.None;
-                updateList();
+                show_type = PhoneItem.Type.None;
+                update_list();
                 return true;
 
             case R.id.show_others:
-                showType = PhoneItem.Type.Others;
-                updateList();
+                show_type = PhoneItem.Type.Others;
+                update_list();
                 return true;
 
             case R.id.show_delete:
-                showType = PhoneItem.Type.Deleted;
-                updateList();
+                show_type = PhoneItem.Type.Deleted;
+                update_list();
                 return true;
 
             case R.id.history_size:
@@ -823,73 +936,157 @@ public class MainActivity extends AppCompatActivity {
                 return super.onOptionsItemSelected(item);
         }
     }
+
+    void show_toast(String text) {
+        Toast.makeText(this, text, Toast.LENGTH_LONG).show();
+    }
+
+    void show_history_size() {
+        AlertDialog.Builder b = new AlertDialog.Builder(MainActivity.this);
+        b.setTitle("歷史檔案大小");
+        long size = all_phones.get_history_size();
+
+        if (size != -1) {
+            b.setMessage(new StringBuilder()
+                    .append(size)
+                    .append(" byte\n")
+                    .append(Double.toString(size / 1024.0))
+                    .append(" KB\n")
+                    .append(Double.toString(size / 1024.0 / 1024.0))
+                    .append(" MB\n").toString());
+        } else {
+            b.setMessage("歷史檔案不存在");
+        }
+        b.show();
+    }
+
+    void delete_history() {
+        if (all_phones.delete_history()) {
+            show_toast("歷史檔案已刪除");
+        } else {
+            show_toast("歷史檔案不存在");
+        }
+    }
 }
 
 class PhoneCompany {
-    String companyName;
-    ArrayList<PhoneItem> phones = new ArrayList<>();
-
-    static final String APPLE = "Apple";
-    static final String SONY = "Sony";
-    static final String GSMART = "GSmart";
-    static final String HTC = "HTC";
-    static final String INHON = "Inhon";
-    static final String BENTEN = "Benten";
-    static final String HUAWEI = "HUAWEI";
-    static final String ASUS = "ASUS";
-    static final String SAMSUNG = "SAMSUNG";
-    static final String INFOCUS = "InFocus";
-    static final String NOKIA = "NOKIA";
-    static final String OPPO = "OPPO";
-    static final String LG = "LG";
-    static final String MTO = "MTO";
-    static final String COOLPAD = "COOLPAD";
-    static final String MI = "MI";
-    static final String TWM = "TWM";
-    static final String SHARP = "SHARP";
-    static final String MEITU = "美圖";
-    static final String MOTO = "MOTO";
-    static final String SUGAR = "SUGAR";
-    static final String UNKNOWN = "UNKNOWN";
-
-    /* 地標圖示與公司名稱的map */
-    private static HashMap<String, String> companyPicMap = new HashMap<>();
-    static  {
-        companyPicMap.put("images/prodpt/844pSa.jpg", APPLE);
-        companyPicMap.put("images/prodpt/051k76.jpg", SONY);
-        companyPicMap.put("images/prodpt/097SwZ.jpg", GSMART);
-        companyPicMap.put("images/prodpt/149vbE.jpg", HTC);
-        companyPicMap.put("images/prodpt/167sKc.jpg", INHON);
-        companyPicMap.put("images/prodpt/414ZPQ.jpg", BENTEN);
-        companyPicMap.put("images/prodpt/502Fc1.jpg", HUAWEI);
-        companyPicMap.put("images/prodpt/586Q6N.jpg", ASUS);
-        companyPicMap.put("images/prodpt/593uAM.jpg", SAMSUNG);
-        companyPicMap.put("images/prodpt/697qw3.jpg", INFOCUS);
-        companyPicMap.put("images/prodpt/751lXt.jpg", NOKIA);
-        companyPicMap.put("images/prodpt/881IQv.jpg", OPPO);
-        companyPicMap.put("images/prodpt/888Pyt.jpg", LG);
-        companyPicMap.put("images/prodpt/957X0d.jpg", MTO);
-        companyPicMap.put("images/prodpt/886lV7.jpg", COOLPAD);
-        companyPicMap.put("images/prodpt/734wY8.gif", MI);
-        companyPicMap.put("images/prodpt/084DtY.jpg", TWM);
-        companyPicMap.put("images/prodpt/319uKq.jpg", SHARP);
-        companyPicMap.put("images/prodpt/741o3d.jpg", MEITU);
-        companyPicMap.put("images/prodpt/965q1b.jpg", MOTO);
-        companyPicMap.put("images/prodpt/7606_L.jpg", SUGAR);
-    };
-
-    static private PhoneCompany UnknownCompany = new PhoneCompany();
-    static {
-        UnknownCompany.companyName = UNKNOWN;
+    private enum PhoneCountry {
+        US,
+        China,
+        Japan,
+        Korea,
+        Taiwan,
+        Unknown,
+        Other,
     }
 
-    static PhoneCompany getCompanyFromPicture(String pic_name) {
-        if (companyPicMap.containsKey(pic_name)) {
-            PhoneCompany comp = new PhoneCompany();
-            comp.companyName = companyPicMap.get(pic_name);;
-            return comp;
+    String name;
+    private PhoneCountry country;
+
+    static PhoneCompany Apple = new PhoneCompany("Apple", PhoneCountry.US);
+    static PhoneCompany ASUS = new PhoneCompany("ASUS", PhoneCountry.Taiwan);
+    static PhoneCompany Benten = new PhoneCompany("Benten", PhoneCountry.Taiwan);
+    static PhoneCompany Blackberry = new PhoneCompany("blackberry", PhoneCountry.US);
+    static PhoneCompany Cat = new PhoneCompany("Cat", PhoneCountry.US);
+    static PhoneCompany coolpad = new PhoneCompany("COOLPAD", PhoneCountry.China);
+    static PhoneCompany GSmart = new PhoneCompany("GSmart", PhoneCountry.Taiwan); /* 技嘉 */
+    static PhoneCompany Google = new PhoneCompany("Google", PhoneCountry.US);
+    static PhoneCompany HTC = new PhoneCompany("HTC", PhoneCountry.Taiwan);
+    static PhoneCompany HUAWEI = new PhoneCompany("HUAWEI", PhoneCountry.China);
+    static PhoneCompany INFOCUS = new PhoneCompany("InFocus", PhoneCountry.Taiwan);
+    static PhoneCompany INHON = new PhoneCompany("Inhon", PhoneCountry.Taiwan); /* 頂新 */
+    static PhoneCompany LG = new PhoneCompany("LG", PhoneCountry.Korea);
+    static PhoneCompany MEITU = new PhoneCompany("美圖", PhoneCountry.China);
+    static PhoneCompany MI = new PhoneCompany("小米", PhoneCountry.China);
+    static PhoneCompany MOTO = new PhoneCompany("MOTO", PhoneCountry.China);
+    static PhoneCompany MTO = new PhoneCompany("MTO", PhoneCountry.Taiwan);
+    static PhoneCompany NOKIA = new PhoneCompany("NOKIA", PhoneCountry.Other);
+    static PhoneCompany OnePlus = new PhoneCompany("OnePlus", PhoneCountry.China);
+    static PhoneCompany Onkyo = new PhoneCompany("Onkyo", PhoneCountry.Japan);
+    static PhoneCompany OPPO = new PhoneCompany("OPPO", PhoneCountry.China);
+    static PhoneCompany SAMSUNG = new PhoneCompany("SAMSUNG", PhoneCountry.Korea);
+    static PhoneCompany SHARP = new PhoneCompany("SHARP", PhoneCountry.Taiwan);
+    static PhoneCompany Sony = new PhoneCompany("Sony", PhoneCountry.Japan);
+    static PhoneCompany SUGAR = new PhoneCompany("SUGAR", PhoneCountry.China);
+    static PhoneCompany TWM = new PhoneCompany("TWM", PhoneCountry.Taiwan);
+    static PhoneCompany Unknown = new PhoneCompany("UNKNOWN", PhoneCountry.Unknown);
+
+    private PhoneCompany(String name, PhoneCountry country) {
+        this.name = name;
+        this.country = country;
+    }
+
+    /* 地標圖示與公司名稱的map */
+    private static HashMap<String, PhoneCompany> company_pic_map = new HashMap<>();
+    static  {
+        company_pic_map.put("images/prodpt/844pSa.jpg", Apple);
+        company_pic_map.put("images/prodpt/051k76.jpg", Sony);
+        company_pic_map.put("images/prodpt/097SwZ.jpg", GSmart);
+        company_pic_map.put("images/prodpt/149vbE.jpg", HTC);
+        company_pic_map.put("images/prodpt/167sKc.jpg", INHON);
+        company_pic_map.put("images/prodpt/414ZPQ.jpg", Benten);
+        company_pic_map.put("images/prodpt/502Fc1.jpg", HUAWEI);
+        company_pic_map.put("images/prodpt/586Q6N.jpg", ASUS);
+        company_pic_map.put("images/prodpt/593uAM.jpg", SAMSUNG);
+        company_pic_map.put("images/prodpt/697qw3.jpg", INFOCUS);
+        company_pic_map.put("images/prodpt/751lXt.jpg", NOKIA);
+        company_pic_map.put("images/prodpt/881IQv.jpg", OPPO);
+        company_pic_map.put("images/prodpt/888Pyt.jpg", LG);
+        company_pic_map.put("images/prodpt/957X0d.jpg", MTO);
+        company_pic_map.put("images/prodpt/886lV7.jpg", coolpad);
+        company_pic_map.put("images/prodpt/734wY8.gif", MI);
+        company_pic_map.put("images/prodpt/084DtY.jpg", TWM);
+        company_pic_map.put("images/prodpt/319uKq.jpg", SHARP);
+        company_pic_map.put("images/prodpt/741o3d.jpg", MEITU);
+        company_pic_map.put("images/prodpt/965q1b.jpg", MOTO);
+        company_pic_map.put("images/prodpt/7606_L.jpg", SUGAR);
+    }
+
+    private static HashMap<String, PhoneCompany> company_name_map = new HashMap<>();
+    static {
+        company_name_map.put("apple", Apple);
+        company_name_map.put("asus", ASUS);
+        company_name_map.put("benten", Benten);
+        company_name_map.put("blackberry", Blackberry);
+        company_name_map.put("CAT®", Cat);
+        company_name_map.put("coolpad", coolpad);
+        company_name_map.put("gsmart", GSmart);
+        company_name_map.put("google", Google);
+        company_name_map.put("htc", HTC);
+        company_name_map.put("huawei", HUAWEI);
+        company_name_map.put("infocus", INFOCUS);
+        company_name_map.put("inhon", INHON);
+        company_name_map.put("lg", LG);
+        company_name_map.put("meitu", MEITU);
+        company_name_map.put("xiaomi", MI);
+        company_name_map.put("motorola", MOTO);
+        company_name_map.put("mto", MTO);
+        company_name_map.put("nokia", NOKIA);
+        company_name_map.put("oneplus", OnePlus);
+        company_name_map.put("onkyo", Onkyo);
+        company_name_map.put("oppo", OPPO);
+        company_name_map.put("samsung", SAMSUNG);
+        company_name_map.put("shape", SHARP);
+        company_name_map.put("sony", Sony);
+        company_name_map.put("sugar", SUGAR);
+        company_name_map.put("twm", TWM);
+    }
+
+    static public PhoneCompany getCompanyFromPicture(String pic_name) {
+        if (company_pic_map.containsKey(pic_name)) {
+            return company_pic_map.get(pic_name);
         } else {
-            return UnknownCompany;
+            return Unknown;
+        }
+    }
+
+    static public PhoneCompany get_company_by_name(String name) {
+        name = name.toLowerCase().trim();
+        if (company_name_map.containsKey(name))
+            return company_name_map.get(name);
+        else {
+
+            return Unknown;
         }
     }
 }

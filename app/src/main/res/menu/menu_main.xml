@@ -13,12 +13,13 @@
                 <item android:id="@+id/show_pad" android:title="平板" />
                 <item android:id="@+id/show_others" android:title="其他裝置" />
                 <item android:id="@+id/show_money_diff" android:title="價格有變" />
-                <item android:id="@+id/show_delete" android:title="已下架" />
+                <!-- <item android:id="@+id/show_delete" android:title="已下架" /> -->
             </group>
         </menu>
     </item>
 
     <item
+        android:id="@+id/main_menu_company"
         app:showAsAction="always"
         android:title="廠牌">
 
@@ -27,18 +28,19 @@
                 <item android:id="@+id/show_all_comp" android:title="ALL" android:checked="true" />
                 <item android:id="@+id/show_apple" android:title="APPLE" />
                 <item android:id="@+id/show_asus" android:title="ASUS" />
-                <item android:id="@+id/show_htc" android:title="hTC" />
-                <item android:id="@+id/show_lg" android:title="LG" />
-                <item android:id="@+id/show_samsung" android:title="Samsung" />
-                <item android:id="@+id/show_sony" android:title="Sony" />
-                <item android:id="@+id/show_infocus" android:title="InFocus" />
+                <item android:id="@+id/show_htc" android:title="HTC" />
                 <item android:id="@+id/show_huawei" android:title="HUAWEI" />
-                <item android:id="@+id/show_oppo" android:title="oppo" />
+                <item android:id="@+id/show_lg" android:title="LG" />
                 <item android:id="@+id/show_mi" android:title="MI" />
-                <item android:id="@+id/show_moto" android:title="moto" />
-                <item android:id="@+id/show_google" android:title="google" />
-                <item android:id="@+id/show_blackberry" android:title="Blackberry" />
-                <item android:id="@+id/show_oneplus" android:title="OnePlus" />
+                <item android:id="@+id/show_moto" android:title="MOTO" />
+                <item android:id="@+id/show_oppo" android:title="OPPO" />
+                <item android:id="@+id/show_samsung" android:title="SAMSUNG" />
+                <item android:id="@+id/show_sony" android:title="SONY" />
+                <item android:id="@+id/show_vivo" android:title="VIVO" />
+                <!-- <item android:id="@+id/show_google" android:title="google" /> -->
+                <!-- <item android:id="@+id/show_blackberry" android:title="Blackberry" /> -->
+                <!-- <item android:id="@+id/show_oneplus" android:title="OnePlus" /> -->
+                <!-- <item android:id="@+id/show_infocus" android:title="InFocus" /> -->
                 <!-- <item android:id="@+id/show_twm" android:title="TWM" /> -->
             </group>
         </menu>

@@ -267,6 +267,11 @@ public class MainActivity extends AppCompatActivity {
                 updateList();
                 return true;
 
+            case R.id.show_nokia:
+                showCompany = PhoneCompany.NOKIA;
+                updateList();
+                return true;
+
 //            case R.id.show_infocus:
 //                showCompany = PhoneCompany.INFOCUS;
 //                updateList();

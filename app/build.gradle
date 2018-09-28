@@ -9,8 +9,8 @@ android {
         applicationId "toy.james732.landtop"
         minSdkVersion 19
         targetSdkVersion 27
-        versionCode 4
-        versionName "2.0 alpha"
+        versionCode 5
+        versionName "2.1 alpha"
     }
     buildTypes {
         release {

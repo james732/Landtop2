@@ -33,6 +33,7 @@
                 <item android:id="@+id/show_lg" android:title="LG" />
                 <item android:id="@+id/show_mi" android:title="MI" />
                 <item android:id="@+id/show_moto" android:title="MOTO" />
+                <item android:id="@+id/show_nokia" android:title="NOKIA" />
                 <item android:id="@+id/show_oppo" android:title="OPPO" />
                 <item android:id="@+id/show_samsung" android:title="SAMSUNG" />
                 <item android:id="@+id/show_sony" android:title="SONY" />

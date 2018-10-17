@@ -1,16 +1,17 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 apply plugin: 'com.google.gms.google-services'
 
 android {
     compileSdkVersion 27
-    buildToolsVersion '28.0.2'
+    buildToolsVersion '28.0.3'
 
     defaultConfig {
         applicationId "toy.james732.landtop"
         minSdkVersion 19
         targetSdkVersion 27
-        versionCode 5
-        versionName "2.1 alpha"
+        versionCode 6
+        versionName "2.2 alpha"
     }
     buildTypes {
         release {
@@ -26,8 +27,12 @@ android {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation 'com.android.support:appcompat-v7:27.1.1'
+    implementation 'com.android.support:appcompat-v7:27+'
     implementation 'org.jsoup:jsoup:1.7.3'
     implementation 'com.google.code.gson:gson:2.8.2'
-    implementation 'com.google.firebase:firebase-core:16.0.3'
+    implementation 'com.google.firebase:firebase-core:16.0.4'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+}
+repositories {
+    mavenCentral()
 }

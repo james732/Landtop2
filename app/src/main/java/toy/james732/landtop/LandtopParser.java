@@ -53,7 +53,7 @@ class LandtopParser extends ParserBase {
                 String name = phone.child(0).child(0).child(0).text();
                 String money = phone.child(1).text();
 
-                if (name.startsWith(companyName))
+                if (name.toLowerCase().startsWith(companyName.toLowerCase()))
                     name = name.substring(companyName.length() + 1);
 
                 int moneyValue = parseMoneyString(money);

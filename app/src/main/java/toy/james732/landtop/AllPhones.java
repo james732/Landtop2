@@ -1,5 +1,6 @@
 package toy.james732.landtop;
 
+import android.util.Log;
 import com.google.gson.Gson;
 
 import java.io.BufferedReader;
@@ -75,6 +76,9 @@ class AllPhones
         try {
             readAndUpdate(parser.parse());
         } catch (Exception e) {
+            Log.d(MainActivity.LOG_TAG_EXCEPTION, "AllPhones constructor " + e.getMessage());
+            for (StackTraceElement ste : e.getStackTrace())
+                Log.d(MainActivity.LOG_TAG_EXCEPTION, ste.toString());
         }
     }
 
@@ -148,6 +152,7 @@ class AllPhones
                     allPhoneItemsMap.put(item.name, item);
                 }
             } catch (IOException e) {
+                Log.d(MainActivity.LOG_TAG_EXCEPTION, "readOldData " + e.getMessage());
             }
         }
     }
@@ -168,10 +173,13 @@ class AllPhones
             o.write(json.getBytes());
             o.close();
         } catch (IOException e) {
+            Log.d(MainActivity.LOG_TAG_EXCEPTION, "saveAllData " + e.getMessage());
         }
     }
 
     private void compareOldPhones(ArrayList<PhoneItem> parsedList) {
+        Log.d(MainActivity.LOG_TAG, "allPhoneItemsMap.size()=" + allPhoneItemsMap.size());
+
         if (allPhoneItemsMap.size() != 0) { /* 如果有舊資料 */
             HashMap<String, PhoneItem> newPhoneMap = new HashMap<>();
 
@@ -213,6 +221,7 @@ class AllPhones
 
             allPhoneItemsMap = newPhoneMap;
 
+            Log.d(MainActivity.LOG_TAG, "diffList.size()=" + diffList.size());
             if (diffList.size() != 0) {
                 result = CompareResult.Updated;
                 saveAllData();

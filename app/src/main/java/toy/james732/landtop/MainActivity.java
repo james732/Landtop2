@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.ListView;
@@ -21,7 +22,8 @@ import java.util.Collections;
 import java.util.HashMap;
 
 public class MainActivity extends AppCompatActivity {
-    private final String LOG_TAG = "LANDTOP";
+    static final String LOG_TAG = "LANDTOP";
+    static final String LOG_TAG_EXCEPTION = "LANDTOP_EXCEPTION";
 
     private Handler uiHandler = new Handler();
 

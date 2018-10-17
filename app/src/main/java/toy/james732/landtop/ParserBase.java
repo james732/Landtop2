@@ -26,9 +26,12 @@ abstract class ParserBase {
     Document getAndParse(String url) throws IOException, InterruptedException {
         Connection.Response response = null;
         while (true) {
+            Log.d(MainActivity.LOG_TAG, "Downloading " + url);
             response = Jsoup.connect(url).execute();
-            if (response.statusCode() == 200)
+            if (response.statusCode() == 200) {
+                Log.d(MainActivity.LOG_TAG, "response.statusCode() == 200");
                 return response.parse();
+            }
             Thread.sleep(1000);
         }
     }

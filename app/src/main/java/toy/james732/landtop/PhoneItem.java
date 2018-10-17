@@ -67,8 +67,6 @@ class PhoneItem {
 
             if (priceHistories.size() > 1) {
                 int prevPrice = priceHistories.get(0).price;
-                if (priceHistories.get(0).isEstimated)
-                    sb.append("*");
                 sb.append(" ");
 
                 for (int i = 1; i < priceHistories.size(); i++) {
@@ -122,8 +120,9 @@ class PhoneItem {
 
     void addNewPriceFromAnother(PhoneItem item) {
         if (getFinalPrice() == -1)
-            priceHistories.remove(priceHistories.size());
-        priceHistories.add(item.priceHistories.get(0));
+            priceHistories.remove(priceHistories.size() - 1);
+        if (getFinalPrice() != item.priceHistories.get(0).price)
+            priceHistories.add(item.priceHistories.get(0));
     }
 
     boolean isAvailable() {

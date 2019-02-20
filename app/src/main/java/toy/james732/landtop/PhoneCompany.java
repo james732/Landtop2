@@ -51,6 +51,7 @@ class PhoneCompany {
     static PhoneCompany HUAWEI = new PhoneCompany("HUAWEI", PhoneCountry.China);
     static PhoneCompany INFOCUS = new PhoneCompany("InFocus", PhoneCountry.Taiwan);
     static PhoneCompany INHON = new PhoneCompany("Inhon", PhoneCountry.Taiwan); /* 頂新 */
+    static PhoneCompany Koobee = new PhoneCompany("Koobee", PhoneCountry.China); /* 酷比 */
     static PhoneCompany LG = new PhoneCompany("LG", PhoneCountry.Korea);
     static PhoneCompany MEITU = new PhoneCompany("美圖", PhoneCountry.China);
     static PhoneCompany MI = new PhoneCompany("小米", PhoneCountry.China);
@@ -60,6 +61,7 @@ class PhoneCompany {
     static PhoneCompany OnePlus = new PhoneCompany("OnePlus", PhoneCountry.China);
     static PhoneCompany Onkyo = new PhoneCompany("Onkyo", PhoneCountry.Japan);
     static PhoneCompany OPPO = new PhoneCompany("OPPO", PhoneCountry.China);
+    static PhoneCompany PANASONIC = new PhoneCompany("Panasonic", PhoneCountry.Japan);
     static PhoneCompany SAMSUNG = new PhoneCompany("SAMSUNG", PhoneCountry.Korea);
     static PhoneCompany SHARP = new PhoneCompany("SHARP", PhoneCountry.Taiwan);
     static PhoneCompany Sony = new PhoneCompany("Sony", PhoneCountry.Japan);
@@ -100,6 +102,8 @@ class PhoneCompany {
         companyPicMap.put("images/prodpt/7606_L.jpg", SUGAR);
         companyPicMap.put("images/prodpt/7283AU.jpg", VIVO);
         companyPicMap.put("images/prodpt/642Js_.gif", Hugiga);
+        companyPicMap.put("images/prodpt/246Alk.jpg", PANASONIC);
+        companyPicMap.put("images/prodpt/5461db.jpg", Koobee);
     }
 
     private static HashMap<String, PhoneCompany> companyNameMap = new HashMap<>();

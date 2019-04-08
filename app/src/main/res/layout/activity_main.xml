@@ -17,12 +17,14 @@
             android:id="@+id/descript_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content" />
+
         <TextView
+            android:id="@+id/forRefOnly"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:gravity="right"
-            android:textSize="10dp"
-            android:text="僅供參考" />
+            android:text="*僅供參考"
+            android:textSize="10dp" />
     </LinearLayout>
 
 

@@ -3,29 +3,76 @@ package toy.james732.landtop;
 import android.app.AlertDialog;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
-import android.os.Handler;
-import android.os.HandlerThread;
+import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.google.firebase.analytics.FirebaseAnalytics;
-
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 
+import androidx.appcompat.app.AppCompatActivity;
+
+class DownloadPhoneTask extends AsyncTask<File, Integer, AllPhones>
+{
+    AllPhones allPhones;
+    private MainActivity mainActivity;
+
+    DownloadPhoneTask(MainActivity mainActivity) {
+        super();
+        this.mainActivity = mainActivity;
+    }
+
+    @Override
+    protected void onPreExecute() {
+        super.onPreExecute();
+    }
+
+    @Override
+    protected void onPostExecute(AllPhones allPhones) {
+        if (allPhones.getResult() == null) {
+            mainActivity.descriptText.setText("無法取得資料，網路可能有問題");
+        } else {
+            switch (allPhones.getResult()) {
+                case NoOldData:
+                    mainActivity.show_toast("初次執行");
+                    break;
+                case Updated:
+                    mainActivity.show_toast("網頁有更新");
+                    mainActivity.showType = PhoneItem.Type.None;
+                    break;
+                case NoUpdated:
+                    mainActivity.show_toast("網頁沒有更新");
+                    break;
+                case Error:
+                    mainActivity.show_toast("發生錯誤");
+                    break;
+            }
+            /* currentShow = allPhones; */
+            this.allPhones = allPhones;
+            mainActivity.updateList();
+            mainActivity.adapter.notifyDataSetChanged();
+            mainActivity.isBusy = false;
+        }
+    }
+
+    @Override
+    protected AllPhones doInBackground(File... params) {
+        return new AllPhones(params[0]);
+    }
+}
+
 public class MainActivity extends AppCompatActivity {
     static final String LOG_TAG = "LANDTOP";
     static final String LOG_TAG_EXCEPTION = "LANDTOP_EXCEPTION";
-
-    private Handler uiHandler = new Handler();
 
     ArrayList<HashMap<String, Object>> listForView = new ArrayList<>();
     ArrayList<PhoneItem> currentShow;
@@ -37,9 +84,7 @@ public class MainActivity extends AppCompatActivity {
     PhoneItem.Type showType = PhoneItem.Type.Phone;
     PhoneCompany showCompany = null;
 
-    AllPhones allPhones;
-
-    FirebaseAnalytics analytics;
+    DownloadPhoneTask downloadPhoneTask;
 
     private boolean isConnected() {
         ConnectivityManager cm = (ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
@@ -55,8 +100,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        analytics = FirebaseAnalytics.getInstance(this);
 
         final ListView listView = findViewById(R.id.myListView);
         listView.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
@@ -83,44 +126,23 @@ public class MainActivity extends AppCompatActivity {
                     b.create().show();
             });
 
-
             listView.setOnItemLongClickListener((adapterView, view, position, l) -> {
                     view.setSelected(true);
                     return true;
             });
 
-            /* 另一個thread負責抓網頁與處理資訊 */
-            HandlerThread thread = new HandlerThread("jsoup");
-            thread.start();
-            Handler threadHandler = new Handler(thread.getLooper());
-            threadHandler.post(() -> {
-                allPhones = new AllPhones(getFilesDir());
-                uiHandler.post(() -> {
-                    if (allPhones.getResult() == null) {
-                        descriptText.setText("無法取得資料，網路可能有問題");
-                    } else {
-                        switch (allPhones.getResult()) {
-                            case NoOldData:
-                                show_toast("初次執行");
-                                break;
-                            case Updated:
-                                show_toast("網頁有更新");
-                                showType = PhoneItem.Type.None;
-                                break;
-                            case NoUpdated:
-                                show_toast("網頁沒有更新");
-                                break;
-                            case Error:
-                                show_toast("發生錯誤");
-                                break;
-                        }
-                        /* currentShow = allPhones; */
-                        updateList();
-                        adapter.notifyDataSetChanged();
-                        isBusy = false;
-                    }
-                });
-            }); /* threadHandler.post */
+            findViewById(R.id.forRefOnly).setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    new AlertDialog.Builder(MainActivity.this)
+                            .setTitle("關於*的說明")
+                            .setMessage("價格有*代表該價錢為估算而來。估算方式為：其他手機的空機價-其他手機的補助價+該手機的補助價。")
+                            .show();
+                }
+            });
+
+            downloadPhoneTask = new DownloadPhoneTask(this);
+            downloadPhoneTask.execute(getFilesDir());
         } else {
             descriptText.setText("無網路連線...");
         }
@@ -131,17 +153,17 @@ public class MainActivity extends AppCompatActivity {
         super.onStop();
     }
 
-    private void updateList() {
+    void updateList() {
         StringBuilder sb = new StringBuilder();
         ArrayList<PhoneItem> tmpList;
 
         if (showType != PhoneItem.Type.None) {
             if (showCompany == null) {
-                tmpList = allPhones.getByType(showType);
+                tmpList = downloadPhoneTask.allPhones.getByType(showType);
                 sb.append("所有廠牌");
             }
             else {
-                tmpList = allPhones.getByCompany(showCompany, showType);
+                tmpList = downloadPhoneTask.allPhones.getByCompany(showCompany, showType);
                 sb.append(showCompany.name);
             }
 
@@ -162,7 +184,7 @@ public class MainActivity extends AppCompatActivity {
             currentShow = new ArrayList<>(tmpList);
         } else {
             sb.append("價格有變");
-            currentShow = new ArrayList<>(allPhones.getDiffList());
+            currentShow = new ArrayList<>(downloadPhoneTask.allPhones.getDiffList());
         }
         Collections.sort(currentShow, (PhoneItem lhs, PhoneItem rhs) ->
             Integer.compare(rhs.getFinalPrice(), lhs.getFinalPrice()));
@@ -338,12 +360,12 @@ public class MainActivity extends AppCompatActivity {
     void showHistorySize() {
         AlertDialog.Builder b = new AlertDialog.Builder(MainActivity.this);
         b.setTitle("歷史檔案大小");
-        b.setMessage(allPhones.getHistorySizeString());
+        b.setMessage(downloadPhoneTask.allPhones.getHistorySizeString());
         b.show();
     }
 
     void deleteHistory() {
-        if (allPhones.deleteHistory()) {
+        if (downloadPhoneTask.allPhones.deleteHistory()) {
             show_toast("歷史檔案已刪除");
         } else {
             show_toast("歷史檔案不存在");

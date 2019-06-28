@@ -53,7 +53,7 @@ class LandtopParser extends ParserBase {
                 String name = phone.child(0).child(0).child(0).text();
                 String money = phone.child(1).text();
 
-                if (name.toLowerCase().startsWith(companyName.toLowerCase()))
+                if (name.toLowerCase().startsWith(companyName.toLowerCase()) && name.charAt(companyName.length())== ' ')
                     name = name.substring(companyName.length() + 1);
 
                 int moneyValue = parseMoneyString(money);
@@ -94,7 +94,7 @@ class LandtopParser extends ParserBase {
                 String reduceString = phone.child(2).text();
                 boolean isEstimated = false;
 
-                if (name.startsWith(companyName))
+                if (name.startsWith(companyName) && name.charAt(companyName.length()) == ' ')
                     name = name.substring(companyName.length() + 1);
 
                 int money = parseMoneyString(moneyString);
